@@ -1,0 +1,5 @@
+I’ve wanted to write something for a while around Terraform and how I’d go about setting it up from scratch. I’ve done it a few times but always forgotten a step or two and had to click about to get it working. To stop that from happening again and to share my insights and experience with you all I’m putting together a terraform mini series on how to setup terraform with Azure Devops to manage Microsoft products. I’m going to be using this as a test environment to try and manage Intune configurations and Power Platform infrastructure as well as the Azure stack.
+
+Follow along at https://anothertechieblog.co.uk/terraform-mini-series-part-1/
+
+Each folder will be the complete working example. You'll just need to configure Azure, Devops and anything outside of the Terraform code as it's covered in the mini series. 
