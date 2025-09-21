@@ -18,8 +18,6 @@ parameters:
   - dev
   - test
   - prod
-  - bootstrap
-
 
 variables:
 - name: envName
