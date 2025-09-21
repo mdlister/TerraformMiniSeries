@@ -1,0 +1,103 @@
+# azure-pipelines.yml
+trigger:
+  branches:
+    include: [ main ]
+  paths:
+    include: [ codebase/**, azure-pipelines.yml ]
+
+pool:
+  vmImage: ubuntu-latest
+
+  
+parameters:
+- name: environment
+  displayName: Target environment
+  type: string
+  default: dev
+  values:
+  - dev
+  - test
+  - prod
+  - bootstrap
+
+
+variables:
+- name: envName
+  value: ${{ parameters.environment }}
+
+
+${{ if eq(parameters.environment, 'dev') }}:
+  - group: tf-dev
+  # - group: kv-dev        # uncomment if you have a KV-linked group for dev
+
+${{ if eq(parameters.environment, 'test') }}:
+  - group: tf-test
+  # - group: kv-test
+
+${{ if eq(parameters.environment, 'prod') }}:
+  - group: tf-prod
+  # - group: kv-prod
+
+
+stages:
+- stage: Validate
+  displayname: Validate ($(envName))
+  jobs:
+  - job: validate
+    steps:
+    - task: TerraformInstaller@1
+      displayName: Install Terraform (latest)
+      inputs:
+        terraformVersion: latest
+
+    # Keep validation backend-less
+    - script: |
+        terraform -chdir=codebase/env/$(envName) init -backend=false
+        terraform -chdir=codebase/env/$(envName) fmt -check -recursive
+        terraform -chdir=codebase/env/$(envName) validate
+      displayName: terraform fmt & validate
+
+- stage: PlanApply
+  displayname: Plan & Apply ($(envName))
+  jobs:
+  - job: plan_apply
+    steps:
+    - task: TerraformInstaller@1
+      displayName: Install Terraform (latest)
+      inputs:
+        terraformVersion: latest
+
+    # INIT with AzureRM backend + OIDC
+    - task: TerraformTask@5
+      displayName: terraform init (azurerm backend + OIDC)
+      inputs:
+        command: init
+        provider: 'azurerm'
+        workingDirectory: codebase/env/$(envName)
+        backendType: azurerm
+        backendAzureRmUseEntraIdForAuthentication: false
+        backendAzureRmUseCliFlagsForAuthentication: true
+        backendServiceArm: 'sc-ado-terraform-wif'
+        backendAzureRmResourceGroupName: $(tfstateRg)
+        backendAzureRmStorageAccountName: $(tfstateSa)
+        backendAzureRmContainerName: $(tfstateContainer)
+        backendAzureRmKey: $(tfstateKey)
+
+    # PLAN with OIDC
+    - task: TerraformTask@5
+      displayName: terraform plan
+      inputs:
+        command: plan
+        workingDirectory: codebase/env/$(envName)
+        environmentServiceNameAzureRM: 'sc-ado-terraform-wif'
+
+    # APPLY with OIDC  
+    - task: TerraformTask@5
+      displayName: terraform apply
+      inputs:
+        command: apply
+        commandOptions: >
+          -auto-approve
+        environmentServiceNameAzureRM: 'sc-ado-terraform-wif'
+        workingDirectory: codebase/env/$(envName)
+
